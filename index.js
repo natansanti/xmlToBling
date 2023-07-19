@@ -10,17 +10,21 @@ function getDestinatarioCNPJ(xml) {
         const parser = new xml2js.Parser();
         parser.parseString(xml, (err, result) => {
             if (err) {
-                reject(err);
+                reject(err)
             } else {
-                const destinatario = result?.nfeProc?.NFe?.[0]?.infNFe[0]?.dest[0];
-                const cnpj = destinatario?.CNPJ[0];
-                const emitente = result?.nfeProc?.NFe[0]?.infNFe[0]?.emit[0]?.xNome[0];
-                const dhSaiEnt = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.dhEmi[0];
-                const nNF = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.nNF[0];
-                const duplicatas = result?.nfeProc?.NFe[0]?.infNFe[0]?.cobr[0]?.dup;
+                if (!result?.nfeProc) {
+                console.log("Este XML não se trata de uma NFe, portando deverá ser importado manualmente no sistema.")
+                } else {
+                    const destinatario = result?.nfeProc?.NFe?.[0]?.infNFe[0]?.dest[0];
+                    const cnpj = destinatario?.CNPJ[0];
+                    const emitente = result?.nfeProc?.NFe[0]?.infNFe[0]?.emit[0]?.xNome[0];
+                    const dhSaiEnt = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.dhEmi[0];
+                    const nNF = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.nNF[0];
+                    const duplicatas = result?.nfeProc?.NFe[0]?.infNFe[0]?.cobr[0]?.dup;
 
-                const data = { cnpj, emitente, dhSaiEnt, duplicatas, nNF };
-                resolve(data);
+                    const data = { cnpj, emitente, dhSaiEnt, duplicatas, nNF };
+                    resolve(data);
+                }
             }
         });
     });
@@ -135,4 +139,3 @@ xmlList.then((arquivos) => {
 }).catch((err) => {
     console.error('Erro ao listar arquivos:', err);
 });
-
