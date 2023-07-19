@@ -2,7 +2,10 @@ const fs = require('fs');
 const xml2js = require('xml2js');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const { format } = require('date-fns');
-const xmlList = require('./xmlList');
+const xmlList = require('./src/xmlList');
+const xmlBlingBody = require('./src/xmlBlingBody');
+const apiBlingImport = require('./src/apiBlingImport');
+require('dotenv').config();
 
 // Função para buscar o CNPJ do destinatário no XML
 function getDestinatarioCNPJ(xml) {
@@ -13,16 +16,17 @@ function getDestinatarioCNPJ(xml) {
                 reject(err)
             } else {
                 if (!result?.nfeProc) {
-                console.log("Este XML não se trata de uma NFe, portando deverá ser importado manualmente no sistema.")
+                    console.log("Este XML não se trata de uma NFe, portando deverá ser importado manualmente no sistema.")
                 } else {
                     const destinatario = result?.nfeProc?.NFe?.[0]?.infNFe[0]?.dest[0];
                     const cnpj = destinatario?.CNPJ[0];
                     const emitente = result?.nfeProc?.NFe[0]?.infNFe[0]?.emit[0]?.xNome[0];
+                    const remtCnpj = result?.nfeProc?.NFe[0]?.infNFe[0]?.emit[0]?.CNPJ[0];
                     const dhSaiEnt = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.dhEmi[0];
                     const nNF = result?.nfeProc?.NFe[0]?.infNFe[0]?.ide[0]?.nNF[0];
                     const duplicatas = result?.nfeProc?.NFe[0]?.infNFe[0]?.cobr[0]?.dup;
 
-                    const data = { cnpj, emitente, dhSaiEnt, duplicatas, nNF };
+                    const data = { cnpj, emitente, dhSaiEnt, duplicatas, nNF, remtCnpj };
                     resolve(data);
                 }
             }
@@ -35,7 +39,80 @@ function formatDate(date) {
     return format(date, 'dd/MM/yyyy', { timeZone: 'America/Sao_Paulo' });
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+
+xmlList.then((arquivos) => {
+    arquivos.forEach((arquivo) => {
+        fs.readFile(`Input/${arquivo}`, 'utf-8', async (err, data) => {
+            if (err) {
+                console.error('Erro ao ler o arquivo XML:', err);
+            } else {
+
+                try {
+                    const {
+                        cnpj, emitente, dhSaiEnt, duplicatas, nNF, remtCnpj
+                    } = await getDestinatarioCNPJ(data);
+                    //Definir portador (empresa)
+                    const portador = () => {
+                        let portador;
+
+                        switch (cnpj) {
+                            case '26476477000131':
+                                portador = "REPUBLICA DOS MÓVEIS";
+                                break;
+                            case '02960401000119':
+                                portador = "NS SANTI";
+                                break;
+                            case '21692216000135':
+                                portador = "VM SANTI";
+                                break;
+                            default:
+                                portador = "Caixa";
+                        }
+                        return portador;
+                    };
+
+                    const quantDupl = duplicatas.length
+
+
+                    for (let i = 0; i < duplicatas.length; i++) {
+                        const dup = duplicatas[i];
+                        const nDup = dup.nDup[0];
+                        const dVenc = dup.dVenc[0];
+                        const vDup = dup.vDup[0];
+
+                        const splitDate = dVenc.split("-");
+                        const formattedDate = `${splitDate[2]}/${splitDate[1]}/${splitDate[0]}`;
+
+                        const xml = xmlBlingBody({
+                            emitente,
+                            cnpj: remtCnpj,
+                            dhSaiEnt: formatDate(new Date(dhSaiEnt)),
+                            vcto: formattedDate,
+                            documento: `${nNF} ${quantDupl} / ${parseInt(nDup)}`,
+                            portador: portador(),
+                            valor: vDup
+                        });
+
+                        await apiBlingImport(xml);
+
+                        // Aguardar 3 segundos antes de continuar para a próxima iteração
+                        await sleep(3000);
+                    }
+
+                    console.log("Dados importados com sucesso!")
+                } catch (error) {
+                    console.error('Erro ao buscar o CNPJ do destinatário:', err);
+                }
+            }
+        })
+    })
+})
+
+/*
 xmlList.then((arquivos) => {
     arquivos.forEach((arquivo) => {
         fs.readFile(`Input/${arquivo}`, 'utf-8', async (err, data) => {
@@ -139,3 +216,4 @@ xmlList.then((arquivos) => {
 }).catch((err) => {
     console.error('Erro ao listar arquivos:', err);
 });
+*/
