@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "esModuleInterop": true,
+      "target": "ESNext",
+      "module": "CommonJS",
+      "outDir": "./dist",
+      "strict": true,
+      "allowJs": true,
+      "sourceMap": true
+      // ... outras configurações ...
+    },
+    "include": ["src/**/*.ts", "src/xmlList.ts", "src/xmlBlingBody.ts"],
+    "exclude": ["node_modules"]
+  }
+  
